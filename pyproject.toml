@@ -1,0 +1,29 @@
+# Picked up by Vercel's FastAPI preset (and by uv/pip when running locally).
+#
+# Vercel only auto-detects an `app` instance at the repository root
+# (app.py, index.py, server.py, main.py, wsgi.py, asgi.py) or inside src/ or
+# app/. The API here lives in a package, so the entrypoint has to be declared.
+# Without the block below the build stops with FASTAPI_ENTRYPOINT_NOT_FOUND.
+#
+# The same two dependencies are listed in requirements.txt at the root, because
+# Vercel accepts either manifest and this keeps the build working whichever one
+# it chooses. The container image keeps using backend/requirements.txt.
+[project]
+name = "openbatteryflux"
+version = "1.0.0"
+description = "openBatteryFlux — battery cell library and simulator API"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    # Only imported when OBF_DATABASE_URL points accounts at a hosted
+    # Turso database instead of the local SQLite file.
+    "turso_serverless>=0.1,<1",
+]
+
+# The project is an application, not a distributable package: nothing needs to
+# be built and installed before the app can be imported.
+[tool.uv]
+package = false
+
+[tool.vercel]
+entrypoint = "backend.app.main:app"

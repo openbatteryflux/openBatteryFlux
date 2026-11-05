@@ -1,0 +1,11 @@
+# Dependencies for the API, for hosts that install from the repository root
+# (Vercel's Python runtime looks for this file or for pyproject.toml).
+# The container image installs backend/requirements.txt instead; keep the pins
+# in the two files, and in pyproject.toml, in step.
+#
+# uvicorn is deliberately absent: Vercel runs the ASGI app itself, while the
+# Docker image gets uvicorn from backend/requirements.txt.
+fastapi>=0.115,<1.0
+# Accounts on a hosted Turso database (OBF_DATABASE_URL). Unused, and never
+# imported, when accounts live in the local SQLite file.
+turso_serverless>=0.1,<1

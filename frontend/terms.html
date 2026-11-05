@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms of service · openBatteryFlux</title>
+<meta name="description" content="The terms for using openBatteryFlux: free of charge, no warranty on the numbers, and a clear engineering and safety disclaimer.">
+<meta name="robots" content="index,follow">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cpath d=%27M4 42H20V36L27 10L40 56L44 30L48 40L52 33H58%27 fill=%27none%27 stroke=%27%230891B2%27 stroke-width=%275%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="css/legal.css?v=3">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand obf-logo" href="/" aria-label="openBatteryFlux home"><span class="wmk"><b>open</b><strong>Battery</strong><em>Flux</em></span><i class="obf-line" aria-hidden="true"></i><svg class="obf-pulse" viewBox="0 0 48 36" aria-hidden="true"><path class="obf-g" pathLength="100" d="M0 22V18L5 .5L15.5 33.5L18.5 13L21 21L24 15.5H43.5"/><path class="obf-p" pathLength="100" d="M0 22V18L5 .5L15.5 33.5L18.5 13L21 21L24 15.5H43.5"/><circle class="obf-d" cx="46.3" cy="15.5" r="2"/></svg></a>
+<nav class="legal" aria-label="Legal pages">
+<a href="privacy.html">Privacy</a>
+<a href="terms.html" aria-current="page">Terms</a>
+<a href="refunds.html">Refunds &amp; donations</a>
+<a href="cookies.html">Cookies</a>
+<a href="legal.html">Legal notice</a>
+</nav>
+<a class="back" href="/">← Back to the app</a>
+</div></header>
+
+<div class="wrap">
+<h1>Terms of service</h1>
+<p class="updated">Version 1.0 · Last updated 27 October 2026</p>
+<p class="lead">These terms cover your use of openBatteryFlux (the "service"): the website, the cell library, the simulator, comparison, calibration and validation tools, and the exports they produce. By using the service you accept them. If you do not accept them, do not use the service.</p>
+
+<h2>1. Who we are</h2>
+<p>The service is operated by the person or company named on the <a href="legal.html">legal notice</a> page ("we", "us"). Our contact address is there too.</p>
+
+<h2>2. What the service is, and what it costs</h2>
+<ul>
+<li>It is a free, browser-based modelling tool for lithium and other battery cells, built on published datasheet values and equivalent-circuit models.</li>
+<li><b>It is free of charge and has no paid tier.</b> There are no subscriptions, no in-app purchases, no feature unlocks, no trial that expires, no ads and no sponsored cells. Nothing about the service is sold to you.</li>
+<li>Donations are optional and voluntary and buy nothing (see the <a href="refunds.html">refunds and donations page</a>).</li>
+</ul>
+
+<h2>3. Your account</h2>
+<ul>
+<li>An account needs a name, an email address and a password of at least 8 characters. Use an address you control and a password you do not use anywhere else.</li>
+<li>One account per person. Keep the password to yourself: anything done with your session is treated as done by you.</li>
+<li>We ask you to confirm your email address before the tools unlock. If email delivery is not configured on this server, accounts are marked confirmed automatically and the page tells you so.</li>
+<li>You can change your name and password, and delete the account, from your account page at any time.</li>
+<li>If you break section 4 we may suspend or delete an account. You will normally be told why.</li>
+</ul>
+
+<h2>4. Acceptable use</h2>
+<p>Please do not:</p>
+<ul>
+<li>attack, overload, probe or bypass the service, its authentication or its usage limits, or use automated traffic that degrades it for others;</li>
+<li>try to reach another person's account or data;</li>
+<li>use the service for anything unlawful, or upload content you have no right to use;</li>
+<li>present the service, or its outputs, as someone else's product, or as endorsed by a cell manufacturer.</li>
+</ul>
+<p>Reading the source code, filing issues and sending pull requests is expressly welcome — that is what the project is for.</p>
+
+<h2>5. The engineering and safety disclaimer — please read this one</h2>
+<div class="card">
+<p><b>Library parameters are illustrative reference values, not manufacturer data.</b> Each cell entry combines published datasheet quantities with chemistry-level model parameters. Until an entry has been validated against measurements, its parameters are a starting point, not a specification.</p>
+<p><b>Calibrate before you rely on a number.</b> The calibration tool refits the model on your own measured profiles. That is what makes a model trustworthy for your cell, at your currents, temperatures and age.</p>
+<p><b>Confidence scores are heuristics, not statistics.</b> They flag when a result leaves the datasheet envelope; they are not confidence intervals and they do not bound the error. Known limits — no hysteresis, no constant-voltage phase, lumped thermal model, single ageing factor, no thermal runaway — are listed on the Documentation page, section 14 "What to keep in mind".</p>
+<p><b>Do not use the outputs as the sole basis for a safety-critical design.</b> Battery cells can vent, ignite or fail. Verify any model against measurements and physical testing before you use it in a product, a charger, a BMS, a vehicle or anything else where a wrong voltage can hurt someone or damage property. You are responsible for your design and for the decisions you take with these numbers.</p>
+</div>
+
+<h2>6. Your content</h2>
+<p>Files you load into the tools are processed in your browser and are not uploaded to us, so we never hold them. Anything you do send us (a pull request, an issue, a suggested cell or a correction) you give us permission to use, edit and publish as part of the project. You keep ownership of what is yours.</p>
+
+<h2>7. Our content</h2>
+<ul>
+<li>The site's text, layout, illustrations, logo and diagrams belong to the project. You may quote and link them, with attribution, for non-commercial and educational use; anything more needs our written permission.</li>
+<li>The source code is published in a public repository. The terms on which you may copy, modify or redistribute it are those of the licence file in that repository, and nothing here changes them.</li>
+<li>Cell and manufacturer names are the trademarks of their owners. We use them to identify the cells described, and we claim no affiliation with or endorsement by any manufacturer.</li>
+<li>Numbers and curves taken from published datasheets are facts about those products, gathered by the project's open-source scrapers, which record their source.</li>
+</ul>
+
+<h2>8. Changes, availability and ending your use</h2>
+<ul>
+<li>The service is provided free and as it is. We do not promise any particular availability, uptime, response time or that a feature will keep existing. We may change, suspend or retire any part of it.</li>
+<li>You can stop using it whenever you like; deleting your account removes your data as described in the <a href="privacy.html">privacy notice</a>.</li>
+<li>We may update these terms. The version and date at the top of this page always show the current ones, and continued use after an update means you accept it.</li>
+</ul>
+
+<h2>9. Liability</h2>
+<p>To the extent the law allows, we are not liable for indirect or consequential loss, lost profit, lost data or damage to property arising from your use of the service, and our total liability is limited to the amount you have paid us for the service in the previous twelve months, which for a free service is nothing.</p>
+<p><b>Nothing in these terms excludes liability that cannot be excluded by law</b>, including liability for death or personal injury caused by negligence, for fraud, or for any right you have as a consumer under the mandatory rules of your country. If you are a consumer, you keep all the statutory rights of your place of residence.</p>
+
+<h2>10. Governing law</h2>
+<p>These terms are governed by the law of the country named on the <a href="legal.html">legal notice</a> page, and the courts of that place have jurisdiction — without taking away the protection of the mandatory consumer rules where you live.</p>
+
+<h2>11. Contact</h2>
+<p>Questions about these terms: use the address on the <a href="legal.html">legal notice</a> page.</p>
+
+<footer class="bottom">
+<p>openBatteryFlux · operator details and contact on the <a href="legal.html">legal notice</a> page.</p>
+<p class="noprint"><a href="/">← Back to the app</a></p>
+</footer>
+</div>
+</body>
+</html>

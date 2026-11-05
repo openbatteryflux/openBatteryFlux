@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+*.db-journal
+*.db-wal
+*.db-shm
+.venv/
+backend/data/app.db
+backend/data/app.db-journal
+backend/data/app.db-wal
+backend/data/app.db-shm
+backend/data/mail.log
+# Local-only working folders: brand assets, LinkedIn campaign output, scraping scripts.
+/brand/
+/marketing/
+/scrapers/

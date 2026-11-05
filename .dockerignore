@@ -1,0 +1,8 @@
+.git
+.freebuff
+node_modules
+__pycache__
+*.pyc
+.DS_Store
+OpenBatteryFlux_v12.html
+README.md

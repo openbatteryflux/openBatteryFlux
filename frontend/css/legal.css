@@ -1,0 +1,209 @@
+/* Styles for the static legal pages (privacy, terms, refunds, cookies,
+   legal notice).
+
+   These pages carry the same design as the app: the same tokens, the same
+   1200px container, the same pill navigation and the same bordered footer.
+   app.css is light by default (html[data-d="1"]), so this file is too — a
+   visitor moving between the app and a legal page sees one site, not two.
+   The stylesheet stays self-contained: these pages must remain readable even
+   if the app's own stylesheet changes, so nothing here is imported from it. */
+:root {
+  --bg: #f5f8fb;
+  --panel: #ffffff;
+  --ink: #0b1b2b;
+  --mut: #4b5f73;
+  --line: #e0e8ef;
+  --acc: #0e7490;
+  --acc2: #047857;
+  --warn: #c2410c;
+  --sh: 0 1px 2px rgba(11, 27, 43, .04), 0 10px 28px -12px rgba(11, 27, 43, .12);
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.6 var(--sans);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere; /* long URLs must not widen the page on a phone */
+}
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+/* the reading column: the app's container width, narrowed to the text */
+.wrap > * { max-width: 82ch; }
+
+/* ---------- top bar: the app's pill navigation ---------- */
+header.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 14px 0 0;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+header.top .wrap {
+  max-width: 1180px;
+  padding: 8px 10px 8px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--sh);
+}
+/* the app's wordmark: open / Battery / Flux, gradient rule, pulse glyph */
+.brand.obf-logo {
+  position: relative;
+  display: inline-block;
+  font-size: 20px;
+  line-height: 1.2;
+  padding: 0 1.867em .4em 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wmk { display: block; font-size: 1em; letter-spacing: -.03em; color: var(--ink); }
+.wmk b { font-weight: 300; }
+.wmk strong { font-weight: 800; }
+.wmk em {
+  font-style: normal;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.obf-line {
+  position: absolute;
+  left: 0;
+  right: 1.867em;
+  bottom: .5em;
+  height: .1em;
+  border-radius: .1em;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+}
+.brand .obf-pulse {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.867em;
+  height: 1.4em;
+  overflow: visible;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
+}
+.obf-p { stroke: var(--acc2); stroke-dasharray: 100; stroke-dashoffset: 0; }
+.obf-g { stroke: var(--acc); stroke-width: 3.4; opacity: 0; }
+.obf-d { fill: var(--acc2); stroke: none; }
+
+/* the way back into the app, mirroring the app's primary button */
+.back {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--acc);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.back:hover { background: color-mix(in srgb, var(--acc) 85%, #000); }
+nav.legal { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; padding: 0; }
+nav.legal a {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mut);
+  text-decoration: none;
+}
+nav.legal a:hover { background: var(--line); color: var(--ink); }
+nav.legal a[aria-current="page"] { background: var(--line); color: var(--ink); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+/* ---------- article ---------- */
+h1 {
+  font-size: clamp(34px, 5vw, 56px);
+  line-height: 1.05;
+  letter-spacing: -.04em;
+  font-weight: 800;
+  margin: 32px 0 8px;
+}
+h2 { font-size: 20px; letter-spacing: -.01em; margin: 34px 0 8px; }
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p, li { color: var(--ink); }
+.lead { color: var(--mut); font-size: 17px; }
+.updated { color: var(--mut); font-size: 14px; margin: 0 0 4px; }
+a { color: var(--acc); }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+code { font: 13px var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; }
+
+/* ---------- blocks reused across the pages ---------- */
+table { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 14px; }
+caption { text-align: left; color: var(--mut); font-size: 13px; padding-bottom: 6px; }
+th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 8px 10px; }
+th { background: var(--panel); font-weight: 700; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin: 18px 0;
+  box-shadow: var(--sh);
+}
+.note { color: var(--mut); font-size: 14px; }
+mark.todo {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 6px;
+}
+dl.kv { display: grid; grid-template-columns: minmax(12ch, 28ch) 1fr; gap: 8px 16px; margin: 8px 0 0; }
+dl.kv dt { color: var(--mut); }
+dl.kv dd { margin: 0; }
+
+/* ---------- footer: the app's .nb-foot ---------- */
+footer.bottom {
+  margin-top: 64px;
+  padding: 24px 0 8px;
+  border-top: 1px solid var(--line);
+  color: var(--mut);
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+footer.bottom p { margin: 0; }
+footer.bottom a { color: var(--acc); }
+
+.print-hint { display: none; }
+/* the app switches its pill bar to a rounded rectangle at 860px */
+@media (max-width: 860px) {
+  header.top .wrap { border-radius: 24px; }
+}
+@media (max-width: 700px) {
+  .wrap { padding: 0 16px 64px; }
+  header.top .wrap { padding: 8px 8px 8px 14px; }
+  dl.kv { grid-template-columns: 1fr; gap: 2px; }
+  dl.kv dd { margin-bottom: 8px; }
+}
+@media (max-width: 420px) {
+  .brand.obf-logo { font-size: 17px; }
+  .back { padding: 7px 12px; }
+}
+@media print {
+  header.top, nav.legal, footer.bottom .noprint { display: none; }
+  body { background: #fff; color: #000; }
+  .wrap { max-width: none; padding: 0; }
+  .wrap > * { max-width: none; }
+}

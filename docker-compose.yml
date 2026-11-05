@@ -1,0 +1,36 @@
+# One command to run everything:
+#   docker compose up --build
+# Then open http://localhost:8000
+#
+# The project name keeps this stack separate from other Compose projects.
+name: openbatteryflux-app
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # "*" lets a separately hosted frontend call this API.
+      # Set it to your site URL in production, e.g. "https://openbatteryflux.com".
+      ALLOWED_ORIGINS: "*"
+      # Email address that gets the /#/admin dashboard, and the only account
+      # that can have it: everyone else is a plain user. If you leave it unset,
+      # the first account to sign up becomes the administrator.
+      OBF_ADMIN_EMAIL: "admin@obf.com"
+      # Sign-up verification emails (Resend). Without a key or a mail file,
+      # new accounts are marked verified automatically and no email is sent.
+      # RESEND_API_KEY: "re_..."
+      # OBF_MAIL_FROM: "openBatteryFlux <no-reply@your-domain.example>"
+      # OBF_APP_ORIGIN: "http://localhost:8000"
+      # Development without Resend: write the emails to a file instead.
+      # OBF_MAIL_FILE: "/app/data/mail.log"
+    volumes:
+      # The database stays editable on your computer: edit
+      # backend/data/cells.db and reload the page.
+      - ./backend/data:/app/data
+      # Live frontend: edit frontend/ and just reload the browser.
+      - ./frontend:/app/frontend:ro
+    restart: unless-stopped

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie policy · openBatteryFlux</title>
+<meta name="description" content="openBatteryFlux sets no cookies. This page lists every item we keep in your browser, why, for how long, and how to remove it.">
+<meta name="robots" content="index,follow">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cpath d=%27M4 42H20V36L27 10L40 56L44 30L48 40L52 33H58%27 fill=%27none%27 stroke=%27%230891B2%27 stroke-width=%275%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="css/legal.css?v=3">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand obf-logo" href="/" aria-label="openBatteryFlux home"><span class="wmk"><b>open</b><strong>Battery</strong><em>Flux</em></span><i class="obf-line" aria-hidden="true"></i><svg class="obf-pulse" viewBox="0 0 48 36" aria-hidden="true"><path class="obf-g" pathLength="100" d="M0 22V18L5 .5L15.5 33.5L18.5 13L21 21L24 15.5H43.5"/><path class="obf-p" pathLength="100" d="M0 22V18L5 .5L15.5 33.5L18.5 13L21 21L24 15.5H43.5"/><circle class="obf-d" cx="46.3" cy="15.5" r="2"/></svg></a>
+<nav class="legal" aria-label="Legal pages">
+<a href="privacy.html">Privacy</a>
+<a href="terms.html">Terms</a>
+<a href="refunds.html">Refunds &amp; donations</a>
+<a href="cookies.html" aria-current="page">Cookies</a>
+<a href="legal.html">Legal notice</a>
+</nav>
+<a class="back" href="/">← Back to the app</a>
+</div></header>
+
+<div class="wrap">
+<h1>Cookie policy</h1>
+<p class="updated">Version 1.0 · Last updated 27 October 2026</p>
+<p class="lead"><b>openBatteryFlux sets no cookies.</b> Not for sign-in, not for preferences, not for statistics. Sign-in uses a token kept in your browser's local storage and sent in a request header. This page lists exactly what is stored, why, and how to get rid of it.</p>
+
+<h2>1. Cookies: none</h2>
+<p>We set no first-party cookies, and the pages embed no third-party content — no advertising, no analytics, no social buttons, no embedded video, no external fonts or images. So there are no third-party cookies to consent to. If your browser shows a cookie from this site, the most likely source is our hosting provider's network edge, which may set strictly necessary cookies in order to deliver the site and block abuse; we cannot read or influence those. Your browser's own cookie list will show you what is there.</p>
+
+<h2>2. What we do keep in your browser</h2>
+<p>These are local storage and session storage entries, not cookies. None of them is readable by any other website, and none of them is sent to us with every request the way a cookie is.</p>
+<table>
+<thead><tr><th>Name</th><th>Purpose</th><th>Type</th><th>Kept</th></tr></thead>
+<tbody>
+<tr><td><code>obf_token</code></td><td>Your sign-in session. Sent only to our own API, in the request header.</td><td>Essential</td><td>Up to 30 days, or until you sign out, change your password or delete the account.</td></tr>
+<tr><td><code>obf_user</code></td><td>A cache of your name, email and role so the page header and account box can be drawn without a round trip. It holds nothing the API will not re-send.</td><td>Essential</td><td>Until you sign out or delete the account.</td></tr>
+<tr><td><code>obf_redirect</code></td><td>Remembers the page you asked for when a tool sent you to the sign-in dialog, so you land where you wanted after signing in.</td><td>Essential</td><td>Until it is used, or the next sign-in.</td></tr>
+<tr><td><code>obf_theme</code></td><td>Whether you chose the light or the dark theme, so the right one is drawn on the next page load.</td><td>Essential</td><td>Until you clear site data.</td></tr>
+<tr><td><code>obf_consent</code></td><td>Your answer to the cookie banner, with the date and the version of this policy you answered. Without it we would have to ask you again on every page.</td><td>Essential</td><td>Until you change your choice or clear site data.</td></tr>
+<tr><td><code>obf_visit</code></td><td>Marks that this browser tab has already been counted once, so one visit is counted instead of every page you open.</td><td>Session only</td><td>Until you close the tab.</td></tr>
+<tr><td><code>obf_vid</code></td><td>A random identifier created by your browser, used to count visits, cell views and tool uses for visitors who are not signed in. Stored on the server only as a 16-character hash — it is not an IP address, a device fingerprint or an advertising ID, and it is not shared with anyone.</td><td>Only with your consent</td><td>Until you clear site data or press <b>Delete my anonymous data</b> in Cookie settings.</td></tr>
+</tbody>
+</table>
+<p class="note">That is the complete list. The tools keep your work in memory only: nothing you load or type into the simulator, comparison, calibration or validation pages is written to your browser's storage or sent to the server.</p>
+
+<h2>3. The consent banner</h2>
+<ul>
+<li>On your first visit a banner offers two equally prominent choices: <b>Accept all</b> and <b>Essential only</b>. Nothing is pre-selected, nothing is hidden behind a link, and closing the banner is not consent — if you do not choose, only essential storage is used until you do.</li>
+<li><b>Essential only</b> keeps you signed in, remembers your consent and remembers the page you were heading to. Nothing about your visit is written to our usage log.</li>
+<li><b>Accept all</b> adds the anonymous usage counting described above, so the project can see which cells and tools people actually use. It never includes your identity, your IP address or anything you type into a tool.</li>
+<li>Your choice is stored in <code>obf_consent</code>, and you can change it whenever you like: <b>Cookie settings</b> in the page footer reopens the banner with your current answer and lets you switch.</li>
+<li>If your browser sends a <b>Global Privacy Control</b> or <b>Do Not Track</b> signal, we treat it as a refusal: anonymous statistics stay off unless you explicitly turn them on.</li>
+</ul>
+
+<h2>4. Removing what is stored</h2>
+<ul>
+<li>Reopen <b>Cookie settings</b> in the footer and choose <b>Essential only</b>, then press <b>Delete my anonymous data</b> to erase the usage rows already linked to this browser.</li>
+<li>Signing out removes the session; deleting your account removes everything linked to it (see the <a href="privacy.html">privacy notice</a>).</li>
+<li>Clearing site data in your browser removes all of the entries above immediately. You will be signed out and the banner will ask again.</li>
+</ul>
+
+<h2>5. Changes</h2>
+<p>If what we store in your browser changes, this table changes with it and the version and date at the top are updated. Because we have no mailing list, this page is where you will see it.</p>
+
+<footer class="bottom">
+<p>openBatteryFlux · operator details and contact on the <a href="legal.html">legal notice</a> page.</p>
+<p class="noprint"><a href="/">← Back to the app</a></p>
+</footer>
+</div>
+</body>
+</html>
