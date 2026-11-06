@@ -188,7 +188,7 @@ el.innerHTML=`<div class="cd-head" style="--c:var(--c-${c.ch})"><span class="tag
 <div class="cd-grid">${row("Capacity",c.Ah+" Ah")}${row("Mass",c.m+" g")}${row("Nominal voltage",c.V+" V")}${row("OCV (max)",c.Vocv?c.Vocv+" V":null)}${row("Cut-off voltage",c.Vcut?c.Vcut+" V":null)}${row("Max C-rate",f1c(c.dsC[1])+" C")}${row("Energy",c.Wh?c.Wh+" Wh":null)}${row("Specific energy",c.E.toFixed(0)+" Wh/kg")}${row("Specific power",c.P.toFixed(0)+" W/kg")}${row("Cycle life",c.cyc?c.cyc+" cycles":null)}${row("Internal resistance",c.ir?c.ir+" mΩ":null)}${row("Resistance factor",c.r0?c.r0.toFixed(3)+" Ω":null)}${row("Dimensions",dims)}${row("Volume",c.vol?c.vol+" cm³":null)}${row("Coverage",c.cov+" %")}</div>
 ${chem?`<div class="cd-sec"><h3>Chemistry</h3><p>${esc(chem)}</p></div>`:""}
 <div class="cd-acts"><button type="button" class="btn p" data-lsel="${k}">${LBSEL.includes(k)?"✓ Selected":"+ Select for the bridge"}</button></div>`;
-OBFAccount.activity("view", null, k);
+cellHit("view",k);OBFAccount.activity("view", null, k);
 $("#celldetail").hidden=false;document.body.classList.add("pick-open")}
 $("#llist").addEventListener("click",e=>{if(e.target.closest("[data-libmore]")){libMore();return}const b=e.target.closest("[data-detail]");if(b){cellDetail(b.dataset.detail);return}if(e.target.closest("[data-lsel],a,button"))return;const card=e.target.closest(".lc,tr[data-id]");if(card&&card.dataset.id)cellDetail(card.dataset.id)});
 $("#celldetail").addEventListener("click",e=>{if(e.target.closest("[data-lsel]"))closeCellDetail()});
@@ -441,16 +441,26 @@ function cpItem(k){const c=CELLS[k];return `<button type="button" class="cp-item
     <span class="meta"><b>${esc(c.n)}</b><small>${esc(c.brand)} · ${esc(c.s)} · ${esc(c.form)} · ${esc(c.kind||"")} · ${c.Ah} Ah</small></span>
     <span class="stat"><b>${Math.round(c.E)}</b>Wh/kg</span>
   </button>`}
-/* The five cells people open most often, from the platform's own usage log.
-   It is aggregate only (no account, no visitor id), so it needs no consent. */
-let POP=null,POPBUSY=false;
-/* Asked for once at start-up, and again on every open while the list is still
-   empty: an empty answer is never kept, or one cold deployment would hide the
-   shortcut for the rest of the visit even after the log has filled up. */
+/* The five cells people open most often, from anonymous counters on the API:
+   one number per cell, with no account, no visitor id and no address, so the
+   shortcut works for every visitor and not only for those who allow the
+   identified usage log. */
+let POP=null,POPBUSY=false,POPAT=0;
+/* Report one cell opened or loaded. Fire and forget: the ranking it feeds must
+   never delay the page, and a failure must never be visible. */
+function cellHit(kind,id){
+  if(!id)return;
+  try{fetch(OBF.apiUrl("/api/cells/hits"),{method:"POST",credentials:"omit",keepalive:true,
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({cell:String(id),kind:kind})}).catch(()=>{})}catch(e){}
+}
+/* Asked for at start-up and on every open, but reused for a minute: a ranking
+   does not change often enough to cost a query each time. An empty answer is
+   never kept, or one cold deployment would hide the shortcut for the visit. */
 async function loadPopular(){
-  if((POP&&POP.length)||POPBUSY)return;
+  if(POPBUSY)return;
+  if(POP&&POP.length&&Date.now()-POPAT<60000)return;
   POPBUSY=true;
-  try{const r=await fetch("/api/cells/popular?limit=5",{headers:{Accept:"application/json"}});const d=r.ok?await r.json():null;POP=((d&&d.cells)||[]).filter(k=>CELLS[k])}catch(e){POP=null}
+  try{const r=await fetch(OBF.apiUrl("/api/cells/popular?limit=5"),{headers:{Accept:"application/json"}});const d=r.ok?await r.json():null;POP=((d&&d.cells)||[]).filter(k=>CELLS[k]);POPAT=Date.now()}catch(e){POP=null}
   POPBUSY=false;
   const dlg=$("#cellpick");if(dlg&&!dlg.hidden)renderPickList();
 }
@@ -491,7 +501,7 @@ function closeCellPicker(){const d=$("#cellpick");if(d){d.hidden=true;document.d
 function confirmPick(id){
   if(id&&!CELLS[id])return;
   var toolMap={k:"calibrate",v:"validate",sim:"simulate",cmp:"compare"};
-  if(id)OBFAccount.activity("use",toolMap[CPICK.kind]||CPICK.kind,id);
+  if(id){cellHit("use",id);POPAT=0;OBFAccount.activity("use",toolMap[CPICK.kind]||CPICK.kind,id);}
   if(CPICK.kind==="k")setKCell(id);
   else if(CPICK.kind==="v")setVCell(id);
   else if(CPICK.kind==="sim")setSimCell(CPICK.slot,id);

@@ -75,8 +75,23 @@ def library_payload() -> dict:
             "etag": '"%s"' % hashlib.sha256(body).hexdigest()[:32],
             "cells": len(payload["cells"]),
             "chemistries": len(payload["chemistries"]),
+            # For the endpoints that only need to know an id exists, and for
+            # naming cells outside the library endpoints: no database read.
+            "ids": frozenset(cell["id"] for cell in payload["cells"]),
+            "names": {cell["id"]: (cell.get("name") or cell.get("model") or cell["id"])
+                      for cell in payload["cells"]},
         })
     return _LIBRARY_CACHE
+
+
+def library_ids() -> frozenset:
+    """Every id in the library, to validate one cheaply."""
+    return library_payload()["ids"]
+
+
+def library_names() -> dict:
+    """id -> display name, from the copy this process already holds."""
+    return library_payload()["names"]
 
 
 @app.get("/api/health")
@@ -151,15 +166,47 @@ def popular_cells(limit: int = 5):
     """The cells opened or used most often, for the picker's shortcut.
 
     Declared before /api/cells/{cell_id} so the path parameter does not swallow
-    it. Only ids are returned: the counts are aggregate and carry no account,
-    visitor id or timestamp.
+    it. Only ids are returned, from the anonymous counters that every visitor
+    feeds (see accounts.bump_cell_hit): nothing here is about a person. A
+    minute of caching is enough for a popularity list and saves the hosted
+    database a query every time somebody opens the picker.
     """
     conn = open_accounts()
     try:
         ids = accounts.popular_cells(conn, limit)
     finally:
         conn.close()
-    return secure({"cells": ids})
+    return JSONResponse(
+        {"cells": ids},
+        headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=600"},
+    )
+
+
+class CellHitIn(BaseModel):
+    """One anonymous "this cell was opened / loaded" report."""
+    cell: str
+    kind: str = "view"
+
+
+@app.post("/api/cells/hits")
+def record_cell_hit(payload: CellHitIn):
+    """Count one cell opened or loaded into a tool, anonymously.
+
+    The picker's "Most used" list is built from these counts, so they have to
+    exist for everybody: no cookie, no consent question, no visitor id, no
+    account. What is stored is one number per cell (accounts.bump_cell_hit),
+    which cannot identify anybody. Unknown ids and unknown kinds are dropped
+    without an error — this call must never harm the page that made it.
+    """
+    cell_id = (payload.cell or "").strip()
+    if not cell_id or cell_id not in library_ids():
+        return secure({"ok": False})
+    conn = open_accounts()
+    try:
+        saved = accounts.bump_cell_hit(conn, cell_id, payload.kind)
+    finally:
+        conn.close()
+    return secure({"ok": bool(saved)})
 
 
 @app.get("/api/cells/{cell_id}")
@@ -785,9 +832,15 @@ def admin_dashboard(window: str = "30", admin: dict = Depends(admin_user)):
     """
     conn = open_accounts()
     try:
-        return secure(accounts.admin_stats(conn, window))
+        payload = accounts.admin_stats(conn, window)
     finally:
         conn.close()
+    # The anonymous popularity counters hold ids only; the names come from the
+    # library this process already has in memory.
+    names = library_names()
+    for item in payload["cells"]["popular"]:
+        item["name"] = names.get(item["id"], item["id"])
+    return secure(payload)
 
 
 def frontend_directory():

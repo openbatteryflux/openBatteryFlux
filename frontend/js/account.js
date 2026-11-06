@@ -884,10 +884,7 @@
     if (!box) return;
     box.innerHTML = '<p class="note">Loading the dashboard…</p>';
     return request("/api/admin/stats?window=" + encodeURIComponent(adminWindow))
-      .then(function (d) {
-        box.innerHTML = adminBody(d);
-        wireAdminGlobal();
-      })
+      .then(function (d) { adminData = d; paintAdmin(); })
       .catch(function (ex) {
         if (ex.status === 403) {
           box.innerHTML = '<div class="card pnl vno"><h2>For administrators only</h2><p>' + esc(ex.message) + "</p></div>";
@@ -895,6 +892,16 @@
           box.innerHTML = '<div class="card pnl vno"><h2>Could not load the dashboard</h2><p>' + esc(ex.message) + "</p></div>";
         }
       });
+  }
+
+  /* Redraw the payload already in hand. The activity chart's own filter and
+     "show all accounts" only change what is displayed, and each of them used to
+     cost a full round of dashboard queries against the account database. */
+  function paintAdmin() {
+    var box = document.getElementById("adminbody");
+    if (!box || !adminData) return;
+    box.innerHTML = adminBody(adminData);
+    wireAdminGlobal();
   }
 
   var WINDOW_KEYS = [["7", "7 days"], ["30", "30 days"], ["all", "All time"]];
@@ -1138,15 +1145,26 @@
       );
     }
 
+    /* Anonymous all-time totals: recorded for every visitor, consent or not,
+       so the panel still names real cells when nobody allows analytics. */
+    var anonPopular = cells.popular || [];
+    var anonNote = anonPopular.length
+      ? '<p class="dash-note">All time, counted anonymously: ' +
+          anonPopular.slice(0, 5).map(function (c) {
+            return esc(c.name || c.id) + ' ×' + (c.total || 0);
+          }).join(' · ') +
+        '</p>'
+      : '';
     var cellsHtml =
       '<div class="card pnl">' +
         '<h2>Most-used cells <span class="adchip">' + esc(win.label || '') + '</span></h2>' +
         (cellTiles
           ? '<div class="adtools adtools-grid">' + cellTiles + '</div>'
-          : '<p class="empty">No cell activity yet. Cell views and uses are ' +
-            'only logged for visitors who allow analytics in the cookie banner, ' +
-            'so this panel stays empty while everyone chooses essential cookies ' +
-            'only, even though the tools themselves are being used.</p>') +
+          : '<p class="empty">No cell activity in this window from visitors who ' +
+            'allowed analytics. Cell views and uses are only logged for those ' +
+            'visitors, so this panel can stay empty while the tools are being ' +
+            'used.</p>') +
+        anonNote +
       '</div>';
     /* ---- live feed ---- */
     var ACTION_ICON = { visit: '🌐', view: '👁', use: '⚡', gate: '🔒', open: '▶', account: '👤' };
@@ -1384,9 +1402,9 @@
     });
     box.addEventListener("click", function (e) {
       var span = e.target.closest && e.target.closest("[data-actspan]");
-      if (span) { adminActSpan = span.dataset.actspan; renderAdmin(); return; }
+      if (span) { adminActSpan = span.dataset.actspan; paintAdmin(); return; }
       var all = e.target.closest && e.target.closest("[data-adall]");
-      if (all) { adminShowAll = !adminShowAll; renderAdmin(); return; }
+      if (all) { adminShowAll = !adminShowAll; paintAdmin(); return; }
       var tile = e.target.closest && e.target.closest("[data-adcell]");
       if (tile) { adCellDetail(tile.dataset.adcell); return; }
       var w = e.target.closest && e.target.closest("[data-window]");

@@ -26,6 +26,7 @@ import re
 import secrets
 import sqlite3
 import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -126,6 +127,22 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS activity_created ON activity(created_at);
 CREATE INDEX IF NOT EXISTS activity_user ON activity(user_id, created_at);
 CREATE INDEX IF NOT EXISTS activity_visitor ON activity(visitor, created_at);
+-- The same rows again, for the two questions the dashboard asks of them:
+-- "this kind, in this window" and "this one cell". Without these, every
+-- dashboard load and every picker open scanned the whole table.
+CREATE INDEX IF NOT EXISTS activity_kind ON activity(kind, created_at);
+CREATE INDEX IF NOT EXISTS activity_cell ON activity(cell_id, kind);
+-- Anonymous popularity counters for the cell picker: at most one row per cell,
+-- with no account, no visitor id, no address and no per-event timestamp. The
+-- activity log above only holds rows for visitors who allowed it in the cookie
+-- banner, so where most people choose "essential only" it says almost nothing;
+-- these counters are what make "Most used" true for everybody.
+CREATE TABLE IF NOT EXISTS cell_hits (
+    cell_id TEXT PRIMARY KEY,
+    views   INTEGER NOT NULL DEFAULT 0,
+    uses    INTEGER NOT NULL DEFAULT 0,
+    last_at TEXT NOT NULL
+);
 -- Rate limiting. A key is a keyed digest, never the address or email itself.
 CREATE TABLE IF NOT EXISTS throttle (
     key           TEXT PRIMARY KEY,
@@ -930,24 +947,103 @@ def add_activity(
     return True
 
 
+# Loading a cell into a tool says more about what people want than opening its
+# details page once, so a use weighs twice a view in the ranking.
+POPULAR_RANKING = "(uses * 2 + views)"
+POPULAR_TTL = 60          # seconds an in-process ranking is reused
+_popular_cache: dict = {}
+_popular_lock = threading.Lock()
+
+
+def bump_cell_hit(conn: sqlite3.Connection, cell_id: str, kind: str) -> bool:
+    """Count one cell opened or loaded, without recording who did it.
+
+    This is the anonymous counter behind the picker's "Most used" shortcut. It
+    keeps one number per cell plus the last time it was touched — no account,
+    no visitor id, no address, no history — so it can be written for every
+    visitor whatever they answered in the cookie banner, and it stays tiny: at
+    most one row per cell in the library.
+
+    The activity log is a different thing: pseudonymous rows, consent gated,
+    which is what the dashboard uses for its audience breakdown.
+    """
+    cell_id = (cell_id or "").strip()[:80]
+    if not cell_id or kind not in ("view", "use"):
+        return False
+    column = "views" if kind == "view" else "uses"
+    conn.execute(
+        f"""INSERT INTO cell_hits (cell_id, views, uses, last_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(cell_id) DO UPDATE SET
+                {column} = {column} + 1, last_at = excluded.last_at""",
+        (cell_id, 1 if kind == "view" else 0, 1 if kind == "use" else 0, _stamp()),
+    )
+    conn.commit()
+    # A fresh count is worth showing: the next picker open must not reuse the
+    # ranking that was built before it.
+    with _popular_lock:
+        _popular_cache.clear()
+    return True
+
+
 def popular_cells(conn: sqlite3.Connection, limit: int = 5) -> list[str]:
     """The cell ids opened or used most often, for the picker's shortcut.
 
-    Every view and every use counts, whether it came from an account or from
-    an anonymous browser. Only ids leave this function: no account, visitor id
-    or timestamp, and ties fall back to whichever cell was touched last.
+    Ranked from the anonymous counters, so it reflects every visitor instead of
+    only those who allowed the identified usage log. A deployment that has not
+    recorded a hit yet — or was upgraded from a version that had no counters —
+    falls back to ranking the activity log, so the shortcut is never blank.
+
+    Only ids leave this function: nothing here is about a person. The answer is
+    reused for a minute inside the process, because the picker asks on every
+    open and a hosted database charges a round trip for each query.
     """
     limit = max(1, min(int(limit), 20))
+    now = time.monotonic()
+    with _popular_lock:
+        cached = _popular_cache.get(limit)
+        if cached and now - cached[0] < POPULAR_TTL:
+            return list(cached[1])
     rows = conn.execute(
-        """SELECT cell_id, COUNT(*) AS n, MAX(created_at) AS last_at
-             FROM activity
-            WHERE cell_id IS NOT NULL AND kind IN ('view', 'use')
-            GROUP BY cell_id
-            ORDER BY n DESC, last_at DESC, cell_id ASC
-            LIMIT ?""",
+        f"""SELECT cell_id FROM cell_hits
+             ORDER BY {POPULAR_RANKING} DESC, last_at DESC, cell_id ASC
+             LIMIT ?""",
         (limit,),
     ).fetchall()
-    return [row["cell_id"] for row in rows]
+    ids = [row["cell_id"] for row in rows]
+    if not ids:
+        rows = conn.execute(
+            """SELECT cell_id, COUNT(*) AS n, MAX(created_at) AS last_at
+                 FROM activity
+                WHERE cell_id IS NOT NULL AND kind IN ('view', 'use')
+                GROUP BY cell_id
+                ORDER BY n DESC, last_at DESC, cell_id ASC
+                LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        ids = [row["cell_id"] for row in rows]
+    with _popular_lock:
+        _popular_cache[limit] = (now, list(ids))
+    return ids
+
+
+def popular_totals(conn: sqlite3.Connection, limit: int = 5) -> list[dict]:
+    """The anonymous counters themselves, for the dashboard's cells panel."""
+    limit = max(1, min(int(limit), 20))
+    return [
+        {
+            "id": row["cell_id"],
+            "views": int(row["views"] or 0),
+            "uses": int(row["uses"] or 0),
+            "total": int(row["views"] or 0) + int(row["uses"] or 0),
+        }
+        for row in conn.execute(
+            f"""SELECT cell_id, views, uses FROM cell_hits
+                 ORDER BY {POPULAR_RANKING} DESC, last_at DESC, cell_id ASC
+                 LIMIT ?""",
+            (limit,),
+        )
+    ]
 
 
 def email_off(conn: sqlite3.Connection, user_id: int) -> bool:
@@ -1101,28 +1197,37 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
     now = _stamp()
     day = _ago(hours=24)
 
-    def count(sql: str, args: tuple = ()) -> int:
-        return conn.execute(sql, args).fetchone()["n"]
-
     def scoped(column: str) -> tuple[str, tuple]:
         """A WHERE fragment limiting a table to the window, and its arguments."""
         return (f" WHERE {column} >= ?", (since,)) if since else ("", ())
 
+    # ---- totals: seven numbers, one query --------------------------------
     where, args = scoped("created_at")
+    active_sql, active_args = (
+        ("SELECT COUNT(*) FROM users WHERE last_seen_at >= ?", (since,))
+        if since
+        else ("SELECT COUNT(*) FROM users WHERE last_seen_at IS NOT NULL", ())
+    )
+    totals_row = conn.execute(
+        "SELECT (SELECT COUNT(*) FROM users) AS users,"
+        " (SELECT COUNT(*) FROM users WHERE role = 'admin') AS admins,"
+        " (SELECT COUNT(*) FROM users WHERE email_verified = 1) AS verified,"
+        " (SELECT COUNT(*) FROM users WHERE last_seen_at >= ?) AS active_24h,"
+        f" ({active_sql}) AS active,"
+        f" (SELECT COUNT(*) FROM users{where}) AS new_users,"
+        f" (SELECT COUNT(*) FROM events{where}) AS events",
+        (day,) + tuple(active_args) + tuple(args) + tuple(args),
+    ).fetchone()
     totals = {
         # These describe the server, not the window.
-        "users": count("SELECT COUNT(*) AS n FROM users"),
-        "admins": count("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'"),
-        "verified": count("SELECT COUNT(*) AS n FROM users WHERE email_verified = 1"),
-        "active_24h": count("SELECT COUNT(*) AS n FROM users WHERE last_seen_at >= ?", (day,)),
+        "users": int(totals_row["users"] or 0),
+        "admins": int(totals_row["admins"] or 0),
+        "verified": int(totals_row["verified"] or 0),
+        "active_24h": int(totals_row["active_24h"] or 0),
         # These describe the window.
-        "active": (
-            count("SELECT COUNT(*) AS n FROM users WHERE last_seen_at >= ?", (since,))
-            if since
-            else count("SELECT COUNT(*) AS n FROM users WHERE last_seen_at IS NOT NULL")
-        ),
-        "new": count(f"SELECT COUNT(*) AS n FROM users{where}", args),
-        "events": count(f"SELECT COUNT(*) AS n FROM events{where}", args),
+        "active": int(totals_row["active"] or 0),
+        "new": int(totals_row["new_users"] or 0),
+        "events": int(totals_row["events"] or 0),
         "generated_at": now,
     }
 
@@ -1171,57 +1276,47 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
             values.append(since)
         return (" WHERE " + " AND ".join(parts) if parts else ""), tuple(values)
 
-    def act_count(conds: tuple = (), cargs: tuple = (), distinct: str | None = None) -> int:
-        clause, values = act(conds, cargs)
-        what = f"COUNT(DISTINCT {distinct})" if distinct else "COUNT(*)"
-        return conn.execute(f"SELECT {what} AS n FROM activity{clause}", values).fetchone()["n"]
-
-    def top_cells(conds: tuple, cargs: tuple = (), limit: int = 5) -> list:
-        """Cells ranked by the number of matching log rows."""
-        clause, values = act(("cell_id IS NOT NULL",) + conds, cargs)
-        return [
-            {
-                "id": row["cell_id"],
-                "name": row["name"] or row["cell_id"],
-                # `count` ranks the row (views + uses); `uses` and `views` are
-                # what the dashboard prints, so a view is never called a use.
-                "count": row["n"],
-                "uses": row["uses"],
-                "views": row["views"],
-                "users": row["users"],
-                "guests": row["guests"],
-            }
-            for row in conn.execute(
-                f"""SELECT cell_id, MAX(cell_name) AS name, COUNT(*) AS n,
-                           SUM(kind = 'use') AS uses, SUM(kind = 'view') AS views,
-                           COUNT(DISTINCT user_id) AS users,
-                           COUNT(DISTINCT visitor) AS guests
-                    FROM activity{clause}
-                    GROUP BY cell_id ORDER BY n DESC, name LIMIT {int(limit)}""",
-                values,
-            )
-        ]
-
     USER = "user_id IS NOT NULL"
     GUEST = "user_id IS NULL"
 
     # Who is using the server: signed-in users next to anonymous visitors.
+    # One grouped query, not nine: this used to be a round trip per number.
+    clause, values = act()
+    audience_row = {
+        bool(row["is_user"]): row
+        for row in conn.execute(
+            f"""SELECT user_id IS NOT NULL AS is_user,
+                       COUNT(DISTINCT user_id) AS users,
+                       COUNT(DISTINCT visitor) AS visitors,
+                       SUM(kind = 'visit') AS visits,
+                       SUM(kind = 'view') AS views,
+                       SUM(kind = 'use') AS uses,
+                       SUM(kind = 'gate') AS gates,
+                       COUNT(DISTINCT CASE WHEN kind IN ('view','use')
+                                           THEN cell_id END) AS cells
+                FROM activity{clause} GROUP BY user_id IS NOT NULL""",
+            values,
+        )
+    }
+
+    def audience_of(is_user: bool) -> dict:
+        row = audience_row.get(is_user)
+        if row is None:
+            return {"people": 0, "visits": 0, "views": 0, "uses": 0,
+                    "gates": 0, "cells": 0}
+        return {
+            "people": int((row["users"] if is_user else row["visitors"]) or 0),
+            "visits": int(row["visits"] or 0),
+            "views": int(row["views"] or 0),
+            "uses": int(row["uses"] or 0),
+            "gates": int(row["gates"] or 0),
+            "cells": int(row["cells"] or 0),
+        }
+
     audience = {
-        "users": {
-            "people": act_count((USER,), distinct="user_id"),
-            "visits": act_count((USER, "kind = 'visit'")),
-            "views": act_count((USER, "kind = 'view'")),
-            "uses": act_count((USER, "kind = 'use'")),
-            "cells": act_count((USER, "kind IN ('view','use')"), distinct="cell_id"),
-            "opens": sum(int(r["count"]) for r in usage_rows.values()),
-        },
-        "guests": {
-            "people": act_count((GUEST,), distinct="visitor"),
-            "visits": act_count((GUEST, "kind = 'visit'")),
-            "views": act_count((GUEST, "kind = 'view'")),
-            "gates": act_count((GUEST, "kind = 'gate'")),
-            "cells": act_count((GUEST, "kind IN ('view','use')"), distinct="cell_id"),
-        },
+        "users": dict(audience_of(True),
+                      opens=sum(int(r["count"]) for r in usage_rows.values())),
+        "guests": audience_of(False),
     }
 
     # Visits per day (or month) for each audience.
@@ -1245,18 +1340,56 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
     ]
 
     # ---- per tool: opens, cell uses, sign-up wall hits, favourite cells --
+    # Two queries for all six tools instead of three per tool.
+    clause, values = act(("tool IS NOT NULL",))
+    per_tool = {
+        row["tool"]: row
+        for row in conn.execute(
+            f"""SELECT tool, SUM(kind = 'use') AS cell_uses,
+                       SUM(kind = 'gate' AND user_id IS NULL) AS guest_gates
+                FROM activity{clause} GROUP BY tool""",
+            values,
+        )
+    }
+    clause, values = act(("kind = 'use'", "cell_id IS NOT NULL", "tool IS NOT NULL"))
+    per_tool_cells: dict[str, list] = {}
+    for row in conn.execute(
+        f"""SELECT tool, cell_id, MAX(cell_name) AS name, COUNT(*) AS n,
+                   COUNT(DISTINCT user_id) AS users,
+                   COUNT(DISTINCT visitor) AS guests
+            FROM activity{clause} GROUP BY tool, cell_id ORDER BY n DESC""",
+        values,
+    ):
+        bucket = per_tool_cells.setdefault(row["tool"], [])
+        if len(bucket) < 5:
+            bucket.append(
+                {
+                    "id": row["cell_id"],
+                    "name": row["name"] or row["cell_id"],
+                    # `count` ranks the row (views + uses); `uses` and `views`
+                    # are what the dashboard prints, so a view is never called
+                    # a use.
+                    "count": row["n"],
+                    "uses": row["n"],
+                    "views": 0,
+                    "users": row["users"],
+                    "guests": row["guests"],
+                }
+            )
+
     tools = []
     for kind in TOOL_KINDS:
         row = usage_rows.get(kind)
+        use_row = per_tool.get(kind)
         tools.append(
             {
                 "kind": kind,
                 "opens": int(row["count"]) if row else 0,
                 "users": int(row["users"]) if row else 0,
                 "last_at": row["last_at"] if row else None,
-                "cell_uses": act_count(("kind = 'use'", "tool = ?"), (kind,)),
-                "guest_gates": act_count((GUEST, "kind = 'gate'", "tool = ?"), (kind,)),
-                "top_cells": top_cells(("kind = 'use'", "tool = ?"), (kind,), 5),
+                "cell_uses": int(use_row["cell_uses"] or 0) if use_row else 0,
+                "guest_gates": int(use_row["guest_gates"] or 0) if use_row else 0,
+                "top_cells": per_tool_cells.get(kind, []),
             }
         )
 
@@ -1291,10 +1424,37 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
                 "by_tool": {k: row[k] for k in TOOL_KINDS},
             }
         )
+    # The same rows once more, split by audience: one query for both lists.
+    by_audience: dict[bool, list] = {True: [], False: []}
+    for row in conn.execute(
+        f"""SELECT cell_id, MAX(cell_name) AS name, user_id IS NOT NULL AS is_user,
+                   COUNT(*) AS n, SUM(kind = 'use') AS uses, SUM(kind = 'view') AS views,
+                   COUNT(DISTINCT user_id) AS users, COUNT(DISTINCT visitor) AS guests
+            FROM activity{clause} GROUP BY cell_id, user_id IS NOT NULL
+            ORDER BY n DESC""",
+        values,
+    ):
+        bucket = by_audience[bool(row["is_user"])]
+        if len(bucket) < 5:
+            bucket.append(
+                {
+                    "id": row["cell_id"],
+                    "name": row["name"] or row["cell_id"],
+                    "count": row["n"],
+                    "uses": int(row["uses"] or 0),
+                    "views": int(row["views"] or 0),
+                    "users": row["users"],
+                    "guests": row["guests"],
+                }
+            )
+
     cells = {
         "overall": overall,
-        "users": top_cells((USER, "kind IN ('view','use')"), (), 5),
-        "guests": top_cells((GUEST, "kind IN ('view','use')"), (), 5),
+        "users": by_audience[True],
+        "guests": by_audience[False],
+        # Anonymous all-time totals: the only popularity numbers that cover
+        # everybody, because they do not depend on the cookie banner.
+        "popular": popular_totals(conn, 10),
     }
 
     # ---- accounts: events per user and the cell each one favours ---------
@@ -1406,16 +1566,23 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
     # The Activity panel carries its own filter (all time / last 30 / last 7
     # days), so this series deliberately ignores the dashboard window and
     # keeps history. It is capped at 92 days to keep the payload small.
+    # Only the last 92 days can appear on the chart, so only those are read:
+    # this used to aggregate every row the tables had ever held.
+    keep_since = _ago(days=92)
     per_day: dict[str, dict[str, int]] = {}
     for row in conn.execute(
         """SELECT substr(created_at, 1, 10) AS day, user_id IS NOT NULL AS is_user,
-                  COUNT(*) AS n FROM activity GROUP BY day, is_user"""
+                  COUNT(*) AS n FROM activity WHERE created_at >= ?
+           GROUP BY day, is_user""",
+        (keep_since,),
     ):
         bucket = per_day.setdefault(row["day"], {"users": 0, "guests": 0})
         bucket["users" if row["is_user"] else "guests"] += row["n"]
     # Signed-in tool opens live in `events`, not in the activity log.
     for row in conn.execute(
-        "SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS n FROM events GROUP BY day"
+        """SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS n FROM events
+           WHERE created_at >= ? GROUP BY day""",
+        (keep_since,),
     ):
         per_day.setdefault(row["day"], {"users": 0, "guests": 0})["users"] += row["n"]
 
