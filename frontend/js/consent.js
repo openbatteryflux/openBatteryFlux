@@ -93,8 +93,9 @@ window.OBFConsent = (function () {
       '<h2 id="consent-title">Cookies and anonymous statistics</h2>' +
       "<p>We set no cookies. Your choice is only about the anonymous usage count: which cells and tools are used. " +
       "It never includes your name, your email, your IP address or anything you type into a tool. " +
-      "Kept apart from that, the cell picker holds one anonymous total per cell — a number, with no id and no " +
-      "address — so it can suggest the cells people open most, and that total counts whatever you choose here.</p>" +
+      "Kept apart from that, the picker holds an anonymous count per cell per day — numbers, with no id, no " +
+      "address and nothing that ties a day to a person — so it can suggest the cells people open most, and " +
+      "those counts include whatever you choose here.</p>" +
       buttons + now +
       '<details><summary>What the two choices mean</summary><ul>' +
       "<li><b>Essential only</b> — keeps you signed in and remembers this choice. Nothing about your visit is written to our usage log.</li>" +

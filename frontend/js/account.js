@@ -1100,10 +1100,11 @@
 
     /* ---- cells panel: same tiles as the Tools section ---- */
     /* Which cells to show. The anonymous counters cover every visitor and are
-       the real popularity, so they lead, and they are all time by nature; the
-       window's own rows (consented visitors only) add the audience detail for
-       the cells that also appear there. Without counters — a deployment that
-       has counted nothing yet — the window rows are all there is. */
+       the real popularity, ranked for the selected window (the API falls back
+       to all time when that window has nothing yet); the window's own rows
+       (consented visitors only) add the audience detail for the cells that also
+       appear there. Without counters — a deployment that has counted nothing —
+       the window rows are all there is. */
     var overallCells = cells.overall || [];
     var anonCells = cells.popular || [];
     var windowById = {};
@@ -1174,14 +1175,21 @@
     var cellsHtml =
       '<div class="card pnl">' +
         '<h2>Most-used cells <span class="adchip">' +
-          (counted ? 'all time · counted anonymously' : esc(win.label || '')) +
+          (counted
+            ? esc(cells.popular_scope || 'all time') + ' · counted anonymously'
+            : esc(win.label || '')) +
         '</span></h2>' +
         (cellTiles
           ? '<div class="adtools adtools-grid">' + cellTiles + '</div>' +
             '<p class="dash-note">How often each cell was opened or loaded into a ' +
-              'tool, counted for every visitor with no identifier stored. Users and ' +
-              'guests come from the usage log for ' + esc(win.label || '') + ', so they ' +
-              'appear only for cells that consenting visitors used in that window.</p>'
+              'tool, counted for every visitor with no identifier stored' +
+              (cells.popular_fallback
+                ? ': nothing has been counted in the ' + esc(win.label || '') +
+                  ' yet, so these are the all-time numbers.'
+                : '.') +
+              ' Users and guests come from the usage log for ' + esc(win.label || '') +
+              ', so they appear only for cells that consenting visitors used in ' +
+              'that window.</p>'
           : '<p class="empty">No cell activity yet: neither the anonymous counters ' +
             'nor the usage log has anything to show.</p>') +
       '</div>';

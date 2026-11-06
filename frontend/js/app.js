@@ -442,9 +442,9 @@ function cpItem(k){const c=CELLS[k];return `<button type="button" class="cp-item
     <span class="stat"><b>${Math.round(c.E)}</b>Wh/kg</span>
   </button>`}
 /* The five cells people open most often, from anonymous counters on the API:
-   one number per cell, with no account, no visitor id and no address, so the
-   shortcut works for every visitor and not only for those who allow the
-   identified usage log. */
+   one count per cell (and per day, so the dashboard can rank a window), with no
+   account, no visitor id and no address, so the shortcut works for every visitor
+   and not only for those who allow the identified usage log. */
 let POP=null,POPBUSY=false,POPAT=0;
 /* Report one cell opened or loaded. Fire and forget: the ranking it feeds must
    never delay the page, and a failure must never be visible. */

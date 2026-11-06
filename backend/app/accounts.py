@@ -143,6 +143,16 @@ CREATE TABLE IF NOT EXISTS cell_hits (
     uses    INTEGER NOT NULL DEFAULT 0,
     last_at TEXT NOT NULL
 );
+-- The same anonymous counts split by UTC day, so the dashboard can rank a 7- or
+-- 30-day window and not only all time. Still a number per cell per day: no
+-- account, no visitor id, no address, nothing that ties a day to a person.
+CREATE TABLE IF NOT EXISTS cell_day_hits (
+    day     TEXT NOT NULL,
+    cell_id TEXT NOT NULL,
+    views   INTEGER NOT NULL DEFAULT 0,
+    uses    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, cell_id)
+);
 -- Rate limiting. A key is a keyed digest, never the address or email itself.
 CREATE TABLE IF NOT EXISTS throttle (
     key           TEXT PRIMARY KEY,
@@ -950,7 +960,10 @@ def add_activity(
 # Loading a cell into a tool says more about what people want than opening its
 # details page once, so a use weighs twice a view in the ranking.
 POPULAR_RANKING = "(uses * 2 + views)"
+POPULAR_RANKING_DAY = "(SUM(uses) * 2 + SUM(views))"
 POPULAR_TTL = 60          # seconds an in-process ranking is reused
+HIT_DAYS_KEPT = 400       # daily buckets retained, pruned on write
+_hit_pruned_at = 0.0
 _popular_cache: dict = {}
 _popular_lock = threading.Lock()
 
@@ -959,10 +972,11 @@ def bump_cell_hit(conn: sqlite3.Connection, cell_id: str, kind: str) -> bool:
     """Count one cell opened or loaded, without recording who did it.
 
     This is the anonymous counter behind the picker's "Most used" shortcut. It
-    keeps one number per cell plus the last time it was touched — no account,
-    no visitor id, no address, no history — so it can be written for every
-    visitor whatever they answered in the cookie banner, and it stays tiny: at
-    most one row per cell in the library.
+    keeps one running number per cell plus one row per cell per UTC day, so the
+    dashboard can rank a 7- or 30-day window as well as all time — no account,
+    no visitor id, no address, nothing that ties a day to a person — and it can
+    be written for every visitor whatever they answered in the cookie banner.
+    It stays tiny: one row per cell, plus one per cell per day.
 
     The activity log is a different thing: pseudonymous rows, consent gated,
     which is what the dashboard uses for its audience breakdown.
@@ -971,13 +985,24 @@ def bump_cell_hit(conn: sqlite3.Connection, cell_id: str, kind: str) -> bool:
     if not cell_id or kind not in ("view", "use"):
         return False
     column = "views" if kind == "view" else "uses"
+    stamp = _stamp()
+    views = 1 if kind == "view" else 0
+    uses = 1 if kind == "use" else 0
     conn.execute(
         f"""INSERT INTO cell_hits (cell_id, views, uses, last_at)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(cell_id) DO UPDATE SET
                 {column} = {column} + 1, last_at = excluded.last_at""",
-        (cell_id, 1 if kind == "view" else 0, 1 if kind == "use" else 0, _stamp()),
+        (cell_id, views, uses, stamp),
     )
+    conn.execute(
+        f"""INSERT INTO cell_day_hits (day, cell_id, views, uses)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(day, cell_id) DO UPDATE SET
+                {column} = {column} + 1""",
+        (stamp[:10], cell_id, views, uses),
+    )
+    _prune_hit_days(conn, stamp[:10])
     conn.commit()
     # A fresh count is worth showing: the next picker open must not reuse the
     # ranking that was built before it.
@@ -1027,9 +1052,47 @@ def popular_cells(conn: sqlite3.Connection, limit: int = 5) -> list[str]:
     return ids
 
 
-def popular_totals(conn: sqlite3.Connection, limit: int = 5) -> list[dict]:
-    """The anonymous counters themselves, for the dashboard's cells panel."""
+def _prune_hit_days(conn: sqlite3.Connection, today: str) -> None:
+    """Drop daily buckets past the retention, at most once an hour.
+
+    A row counts a cell per day, not a visitor, so a year of history is still a
+    few numbers per cell; the prune only stops the table growing forever.
+    """
+    global _hit_pruned_at
+    now = time.monotonic()
+    if now - _hit_pruned_at < 3600:
+        return
+    _hit_pruned_at = now
+    cutoff = (
+        datetime.strptime(today, "%Y-%m-%d") - timedelta(days=HIT_DAYS_KEPT)
+    ).strftime("%Y-%m-%d")
+    conn.execute("DELETE FROM cell_day_hits WHERE day < ?", (cutoff,))
+
+
+def popular_totals(conn: sqlite3.Connection, limit: int = 5, days: int | None = None) -> list[dict]:
+    """The anonymous counters themselves, for the dashboard's cells panel.
+
+    `days` ranks that rolling window from the daily buckets. Without it the
+    all-time totals are used — what the picker reads, and what an upgraded
+    deployment starts with.
+    """
     limit = max(1, min(int(limit), 20))
+    if days:
+        rows = conn.execute(
+            f"""SELECT cell_id, SUM(views) AS views, SUM(uses) AS uses
+                 FROM cell_day_hits WHERE day >= ?
+                 GROUP BY cell_id
+                 ORDER BY {POPULAR_RANKING_DAY} DESC, MAX(day) DESC, cell_id ASC
+                 LIMIT ?""",
+            (_ago(days=days)[:10], limit),
+        )
+    else:
+        rows = conn.execute(
+            f"""SELECT cell_id, views, uses FROM cell_hits
+                 ORDER BY {POPULAR_RANKING} DESC, last_at DESC, cell_id ASC
+                 LIMIT ?""",
+            (limit,),
+        )
     return [
         {
             "id": row["cell_id"],
@@ -1037,12 +1100,7 @@ def popular_totals(conn: sqlite3.Connection, limit: int = 5) -> list[dict]:
             "uses": int(row["uses"] or 0),
             "total": int(row["views"] or 0) + int(row["uses"] or 0),
         }
-        for row in conn.execute(
-            f"""SELECT cell_id, views, uses FROM cell_hits
-                 ORDER BY {POPULAR_RANKING} DESC, last_at DESC, cell_id ASC
-                 LIMIT ?""",
-            (limit,),
-        )
+        for row in rows
     ]
 
 
@@ -1448,13 +1506,23 @@ def admin_stats(conn: sqlite3.Connection, window: str | None = "30") -> dict:
                 }
             )
 
+    # Anonymous popularity for this window, ranked from the daily buckets so the
+    # 7- and 30-day chips change the cells too. Those buckets start with this
+    # version, so a fresh window can be empty while the all-time totals are not:
+    # fall back to those and say so, rather than blanking the panel.
+    popular = popular_totals(conn, 10, days=days)
+    popular_fallback = bool(days and not popular)
+    if popular_fallback:
+        popular = popular_totals(conn, 10)
     cells = {
         "overall": overall,
         "users": by_audience[True],
         "guests": by_audience[False],
-        # Anonymous all-time totals: the only popularity numbers that cover
-        # everybody, because they do not depend on the cookie banner.
-        "popular": popular_totals(conn, 10),
+        # The only popularity numbers that cover everybody, because they do not
+        # depend on the cookie banner.
+        "popular": popular,
+        "popular_scope": "all time" if (not days or popular_fallback) else label,
+        "popular_fallback": popular_fallback,
     }
 
     # ---- accounts: events per user and the cell each one favours ---------
