@@ -1099,23 +1099,49 @@
       '</div>';
 
     /* ---- cells panel: same tiles as the Tools section ---- */
+    /* Which cells to show. The anonymous counters cover every visitor and are
+       the real popularity, so they lead, and they are all time by nature; the
+       window's own rows (consented visitors only) add the audience detail for
+       the cells that also appear there. Without counters — a deployment that
+       has counted nothing yet — the window rows are all there is. */
     var overallCells = cells.overall || [];
-    var cellPeak = overallCells.reduce(function (m, c) { return Math.max(m, c.total || 0); }, 0);
-    var cellTiles = overallCells.map(function (cell) {
+    var anonCells = cells.popular || [];
+    var windowById = {};
+    overallCells.forEach(function (c) { windowById[c.id] = c; });
+    var counted = anonCells.length > 0;
+    var cellRows = (counted ? anonCells : overallCells).map(function (c) {
+      var detail = windowById[c.id] || {};
+      return {
+        id: c.id,
+        name: c.name || detail.name || c.id,
+        total: c.total || 0,
+        views: c.views || 0,
+        uses: c.uses || 0,
+        /* The counters say nothing about who, so these stay unknown unless the
+           window's consented rows know this cell. */
+        users: counted ? detail.users : (c.users || 0),
+        guests: counted ? detail.guests : (c.guests || 0)
+      };
+    });
+    var cellPeak = cellRows.reduce(function (m, c) { return Math.max(m, c.total); }, 0);
+    var cellTiles = cellRows.map(function (cell) {
       var name = cell.name || cell.id || '—';
+      var audienceKnown = cell.users != null || cell.guests != null;
       return (
         '<div class="adtool adtile-click" role="button" tabindex="0" data-adcell="' + esc(cell.id || '') + '"' +
           ' style="--tc:var(--acc)" aria-label="Details for ' + esc(name) + '">' +
           '<div class="adtool-head">' +
             '<span class="adtool-tag name" title="' + esc(name) + '">' + esc(name) + '</span>' +
           '</div>' +
-          '<div class="adtool-total">' + (cell.total || 0) + ' total</div>' +
-          adBar(cell.total || 0, cellPeak, 'var(--acc)') +
+          '<div class="adtool-total">' + cell.total + ' total</div>' +
+          adBar(cell.total, cellPeak, 'var(--acc)') +
           '<div class="adtool-meta">' +
-            '<span>' + (cell.views || 0) + ' views</span>' +
-            '<span>' + (cell.uses || 0) + ' uses</span>' +
-            '<span>' + (cell.users || 0) + ' users</span>' +
-            '<span>' + (cell.guests || 0) + ' guests</span>' +
+            '<span>' + cell.views + ' views</span>' +
+            '<span>' + cell.uses + ' uses</span>' +
+            (audienceKnown
+              ? '<span>' + (cell.users || 0) + ' users</span>' +
+                '<span>' + (cell.guests || 0) + ' guests</span>'
+              : '') +
           '</div>' +
         '</div>'
       );
@@ -1145,26 +1171,19 @@
       );
     }
 
-    /* Anonymous all-time totals: recorded for every visitor, consent or not,
-       so the panel still names real cells when nobody allows analytics. */
-    var anonPopular = cells.popular || [];
-    var anonNote = anonPopular.length
-      ? '<p class="dash-note">All time, counted anonymously: ' +
-          anonPopular.slice(0, 5).map(function (c) {
-            return esc(c.name || c.id) + ' ×' + (c.total || 0);
-          }).join(' · ') +
-        '</p>'
-      : '';
     var cellsHtml =
       '<div class="card pnl">' +
-        '<h2>Most-used cells <span class="adchip">' + esc(win.label || '') + '</span></h2>' +
+        '<h2>Most-used cells <span class="adchip">' +
+          (counted ? 'all time · counted anonymously' : esc(win.label || '')) +
+        '</span></h2>' +
         (cellTiles
-          ? '<div class="adtools adtools-grid">' + cellTiles + '</div>'
-          : '<p class="empty">No cell activity in this window from visitors who ' +
-            'allowed analytics. Cell views and uses are only logged for those ' +
-            'visitors, so this panel can stay empty while the tools are being ' +
-            'used.</p>') +
-        anonNote +
+          ? '<div class="adtools adtools-grid">' + cellTiles + '</div>' +
+            '<p class="dash-note">How often each cell was opened or loaded into a ' +
+              'tool, counted for every visitor with no identifier stored. Users and ' +
+              'guests come from the usage log for ' + esc(win.label || '') + ', so they ' +
+              'appear only for cells that consenting visitors used in that window.</p>'
+          : '<p class="empty">No cell activity yet: neither the anonymous counters ' +
+            'nor the usage log has anything to show.</p>') +
       '</div>';
     /* ---- live feed ---- */
     var ACTION_ICON = { visit: '🌐', view: '👁', use: '⚡', gate: '🔒', open: '▶', account: '👤' };
@@ -1354,6 +1373,14 @@
     var cells = (adminData && adminData.cells) || {};
     var cell = null;
     (cells.overall || []).forEach(function (c) { if (!cell && c.id === cellId) cell = c; });
+    /* A cell that only the anonymous counters know still gets a dialog; the
+       audience numbers are simply unknown and print as —. */
+    (cells.popular || []).forEach(function (c) {
+      if (!cell && c.id === cellId) {
+        cell = { id: c.id, name: c.name, total: c.total, views: c.views, uses: c.uses,
+                 users: null, guests: null };
+      }
+    });
     if (!cell) return;
     var byTool = cell.by_tool || {};
     var toolRows = Object.keys(byTool).filter(function (k) { return byTool[k]; }).map(function (k) {
