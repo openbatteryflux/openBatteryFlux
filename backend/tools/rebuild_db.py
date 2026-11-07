@@ -52,6 +52,48 @@ def display_model(brand, model):
     return " ".join(words[cut:])
 
 
+# One spelling per country: the library uses full country names, so the variants
+# that crept in from different sources collapse onto those.
+COUNTRY_ALIASES = {
+    "USA": "United States",
+    "US": "United States",
+    "U.S.": "United States",
+    "United States of America": "United States",
+    "UK": "United Kingdom",
+    "Great Britain": "United Kingdom",
+    "Korea": "South Korea",
+    "Republic of Korea": "South Korea",
+    "Taiwan, China": "Taiwan",
+}
+
+# Home country per manufacturer: a maker has one, even when it assembles cells in
+# several countries, so a brand whose cells carry more than one country in the
+# sources is pinned here to where the company is based (not where a plant is).
+BRAND_COUNTRY = {
+    "A123 Systems": "United States",       # Westborough, MA (Wanxiang-owned)
+    "Enpower Greentech": "United States",  # Enpower Greentech Inc., Ann Arbor, MI
+    "LG Energy Solution / LG新能源": "South Korea",
+    "Molicel / 能元科技": "Taiwan",          # E-One Moli Energy, New Taipei
+    "Murata / 村田": "Japan",
+    "Panasonic": "Japan",
+    "Panasonic / 松下": "Japan",
+    "Reliance": "India",                   # Reliance New Energy, Mumbai
+    "Rincell": "United States",            # Fremont, CA (volume line in India)
+    "Samsung SDI / 三星SDI": "South Korea",
+    "SunPower / 长虹三杰": "China",        # Jiangsu Sunpower / Changhong Sange
+    "Tenpower / 天鹏": "China",             # Jiangsu Tenpower, Zhangjiagang
+}
+
+
+def country_for(brand, country):
+    """The single home country for a brand, with one spelling per country."""
+    pinned = BRAND_COUNTRY.get(brand)
+    if pinned:
+        return pinned
+    country = (country or "").strip()
+    return COUNTRY_ALIASES.get(country, country)
+
+
 def main():
     if not CSV.exists():
         sys.exit(f"merged CSV not found: {CSV}")
@@ -99,6 +141,9 @@ def main():
 
     for r in rows:
         vals = [r[c] for c in header]
+        if "country" in header:
+            vals[header.index("country")] = country_for(
+                str(r.get("brand") or "").strip(), r.get("country"))
         if "name" in header:
             model = (r.get("model") or "").strip()
             brand = str(r.get("brand") or "").split(" / ")[0].strip()
