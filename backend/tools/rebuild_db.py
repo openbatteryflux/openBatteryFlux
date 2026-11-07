@@ -12,6 +12,8 @@ than the app's 12-column schema. This tool:
   3. computes `name` as  "<brand> <model> · <capacity> Ah"  so the library
      displays brand + model + capacity (the app falls back to this when `name`
      is present, otherwise it would use only chemistry + form + capacity).
+     A model that repeats its own brand is de-duplicated first, and a model that
+     is nothing but the brand name leaves just the brand: "Samsung SDI · 94 Ah".
 
 Usage:
     .venv/bin/python backend/tools/rebuild_db.py
@@ -19,6 +21,7 @@ Usage:
 """
 import csv
 import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -28,6 +31,25 @@ import chem_profiles
 ROOT = Path(__file__).resolve().parent.parent.parent
 CSV = ROOT / "scrapers" / "cells" / "cells.csv"
 DB = Path(os.environ.get("OBF_DB_PATH") or ROOT / "backend" / "data" / "cells.db")
+
+
+def display_model(brand, model):
+    """Drop the brand words a model repeats, so names stop stuttering.
+
+    "Samsung SDI / 三星SDI" + "SDI"  -> ""      (brand alone is enough)
+    "CATL / 宁德时代" + "CATL 811"    -> "811"
+
+    Only *leading* words that already appear in the brand are dropped, so a part
+    number like "INR21700-50E" or "NCR21700A" is never touched.
+    """
+    words = model.split()
+    brand_words = set(re.findall(r"[a-z0-9]+", brand.lower()))
+    cut = 0
+    while cut < len(words):
+        if re.sub(r"[^a-z0-9]", "", words[cut].lower()) not in brand_words:
+            break
+        cut += 1
+    return " ".join(words[cut:])
 
 
 def main():
@@ -80,8 +102,10 @@ def main():
         if "name" in header:
             model = (r.get("model") or "").strip()
             brand = str(r.get("brand") or "").split(" / ")[0].strip()
+            model = display_model(brand, model)
             cap = r.get("capacity_ah") or ""
-            vals[header.index("name")] = f"{brand} {model} · {cap} Ah".strip(" ·")
+            head = " ".join(part for part in (brand, model) if part)
+            vals[header.index("name")] = f"{head} · {cap} Ah"
         batch.append([cell_val(v) for v in vals])
     cur.executemany(ins, batch)
     cur.execute("CREATE INDEX idx_cells_chemistry ON cells(chemistry)")
