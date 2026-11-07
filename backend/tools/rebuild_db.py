@@ -107,6 +107,16 @@ def main():
     # ---- current chemistries ----------------------------------------------
     chem_rows = chem_profiles.rows()
 
+    # A manufacturer has exactly one home country: refuse to build a DB where a
+    # brand carries two, which means the merge or BRAND_COUNTRY went stale.
+    by_brand = {}
+    for r in rows:
+        brand = str(r.get("brand") or "").strip()
+        by_brand.setdefault(brand, set()).add(country_for(brand, r.get("country")))
+    split = {b: sorted(cs) for b, cs in by_brand.items() if len(cs) > 1}
+    if split:
+        sys.exit("brands with more than one country: " + repr(split))
+
     # ---- write new DB ------------------------------------------------------
     if DB.exists():
         DB.unlink()
