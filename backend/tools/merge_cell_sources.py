@@ -64,7 +64,7 @@ TUM_BRAND_CANON = {
     "GBS ZhEJIANG Systems": "GBS",
     "ATL - Amperex Technology": "ATL / 东莞新能源",
     "Neosonic Li-Polymer Energy": "Neosonic",
-    "Yoku Energy (Shenzhen) Co": "Yoku / 深圳移客",
+    "Yoku Energy (Shenzhen) Co": "Yoku / 优科能源",
     "Wuhan Lisun Power Corp. Ltd": "Wuhan Lisun / 武汉力神",
 }
 
