@@ -61,9 +61,9 @@ TUM_BRAND_CANON = {
     "JIANGSU HIGEE": "HIGEE / 海基新能源",
     "Jiangsu FREY": "FREY / 江苏弗雷",
     "Yinglong": "Yinlong / 银隆",
-    "GBS ZhEJIANG Systems": "GBS / 浙江",
+    "GBS ZhEJIANG Systems": "GBS",
     "ATL - Amperex Technology": "ATL / 东莞新能源",
-    "Neosonic Li-Polymer Energy": "Neosonic / 新能安",
+    "Neosonic Li-Polymer Energy": "Neosonic",
     "Yoku Energy (Shenzhen) Co": "Yoku / 深圳移客",
     "Wuhan Lisun Power Corp. Ltd": "Wuhan Lisun / 武汉力神",
 }
