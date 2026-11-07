@@ -87,6 +87,11 @@ BRAND_CANON = {
     "sinowatt": "Sinowatt",
     "Kayo battery co., ltd": "Kayo Battery Co., Ltd",
     "Guangzhou FULLRIVER Battery New Technology Co": "Guangzhou Fullriver Battery New Technology Co",
+    # Joint-supply / partner strings: keep the manufacturer that brands the cell.
+    "BMZ / Sony": "BMZ",
+    "BMZ / TerraE": "TerraE",
+    "Amprius / Wuxi Lead": "Amprius",
+    "Tesla/Panasonic": "Tesla",
 }
 
 
